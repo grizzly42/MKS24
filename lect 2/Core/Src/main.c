@@ -96,11 +96,17 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   uint8_t i = 0;
-  uint8_t array[32] = {1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,0,0,0,0,0,0,0};
+  uint8_t x = 0;
+  //uint8_t array[32] = {1,0,1,0,1,0,0,1,1,1,0,1,1,1,0,1,1,1,0,0,1,0,1,0,1,0,0,0,0,0};
+
+  uint32_t seq = 0b1010100111011101110010101000000;
 
   while (1)
   {
-	  if (array[i] == 1 ){
+	  x = (seq>>i)&1;
+
+	 // if (array[i] == 1 ){
+	  if (x == 1 ){
 		  LL_GPIO_SetOutputPin(LD2_GPIO_Port, LD2_Pin);
 	  }else{
 		  LL_GPIO_ResetOutputPin(LD2_GPIO_Port, LD2_Pin);
