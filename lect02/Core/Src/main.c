@@ -35,7 +35,7 @@
 #define LED_TIME_SHORT 100
 #define LED_TIME_LONG 1000
 #define BUTT_TIME 40
-
+#define EDGE_CHECK 5
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -73,6 +73,16 @@ void blink(void)
 void button()
 {
 	static uint32_t delay2;
+	static uint32_t delay3;
+
+	static uint16_t debounce = 0xFFFF;
+	if (Tick > delay3 + EDGE_CHECK) {
+		debounce <<=1;
+
+
+
+	}
+
 	if (Tick > delay2 + BUTT_TIME) {
 
 		static uint32_t old_s2;
