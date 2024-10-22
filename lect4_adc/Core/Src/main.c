@@ -26,7 +26,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+#define DELAY 1000
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -153,35 +153,43 @@ int main(void)
   while (1)
   {
 
-	 // printf("Hodnota=%u", apply_Q(value_avg));
+	  // printf("Hodnota=%u", apply_Q(value_avg));
 
 
 	  uint8_t s1 = HAL_GPIO_ReadPin(S1_GPIO_Port, S1_Pin);
 	  uint8_t s2 = HAL_GPIO_ReadPin(S2_GPIO_Port, S2_Pin);
+	  static uint32_t time;
 
-	  if(!s1 & s2){
-		state = SHOW_TEMP;
-	  }
-	  if(s1 & !s2){
-		state = SHOW_VOLT;
-	  }
 
-	  state = SHOW_POT;
+
+		  if(s1 == 0){
+			  state = SHOW_TEMP;
+			  time = HAL_GetTick();
+		  }
+		  if(s2 == 0){
+			  state = SHOW_VOLT;
+			  time = HAL_GetTick();
+		  }
+		  if(HAL_GetTick() > (time + DELAY)){
+			  state = SHOW_POT;
+		  }
+
+
+	  //state = SHOW_POT;
 
 	  if (state == SHOW_POT){
-
-	  sct_value(raw_pot*500.9/4095,raw_pot*9/4095 );
+		  sct_value(raw_pot*500.9/4095,raw_pot*9/4095 );
 	  }
 	  if (state == SHOW_VOLT){
-	  sct_value(voltage,2 );
+		  sct_value(voltage,2 );
 	  }
 	  if (state == SHOW_TEMP){
-	  sct_value(temperature,3 );
+		  sct_value(temperature,3 );
 	  }
 	  HAL_Delay(50);
-    /* USER CODE END WHILE */
+	  /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
+	  /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
