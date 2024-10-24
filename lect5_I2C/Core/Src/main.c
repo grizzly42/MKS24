@@ -1,20 +1,20 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2024 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2024 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -42,6 +42,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c1;
+
 UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_rx;
 
@@ -55,6 +57,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -70,27 +73,50 @@ int _write(int file, char const *buf, int n){
 
 
 static void uart_process_command(const char *data){
-	/*char *token;
-	token = strtok(data, "");
+	char *token;
+	token = strtok(data, " ");
 
 	if (strcasecmp(token, "HELLO") == 0) {
-		printf("Komunikace OK\n");
+		printf("Communication OK\n");
 	}else if (strcasecmp(token, "LED1") == 0) {
 		token = strtok(NULL, " ");
-
-		if (strcasecmp(token, "ON") == 0){
-            HAL_GPIO_WritePin(GPIOx, GPIO_Pin, PinState)
-		} else if (strcasecmp(token, "OFF") {
-
-			printf("OK\n");
-		}else if (strcasecmp){
-
+		if (strcasecmp(token, "ON") == 0) {
+			HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 1);
+		} else if (strcasecmp(token, "OFF") == 0) {
+			HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 0);
 		}
+		printf("OK\n");
+
+	}else if (strcasecmp(token, "LED2") == 0) {
+		token = strtok(NULL, " ");
+		if (strcasecmp(token, "ON") == 0) {
+			HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 1);
+		} else if (strcasecmp(token, "OFF") == 0) {
+			HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 0);
+		}
+		printf("OK\n");
+
+	}else if (strcasecmp(token, "STATUS") == 0) {
+		if (HAL_GPIO_ReadPin(LED1_GPIO_Port, LED1_Pin)) {
+			printf("LED1 ON\n");
+		} else
+
+			printf("LED1 OFF\n");
+
+		if (HAL_GPIO_ReadPin(LED2_GPIO_Port, LED2_Pin)) {
+			printf("LED2 ON\n");
+		} else
+
+			printf("LED2 OFF\n");
+
+	}
 
 
-		token = strtok(NULL,"");
-*/
-	printf("received: '%s'\n", data);
+
+
+
+
+	//printf("received: '%s'\n", data);
 
 }
 
@@ -137,30 +163,31 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_USART2_UART_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-  HAL_UART_Receive_DMA(&huart2, uart_rx_buf, RX_BUFFER_LEN);
+	HAL_UART_Receive_DMA(&huart2, uart_rx_buf, RX_BUFFER_LEN);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-	/*  uint8_t c;
+	while (1)
+	{
+		/*  uint8_t c;
 	  HAL_UART_Receive(&huart2, &c, 1, HAL_MAX_DELAY);
 	  HAL_UART_Transmit(&huart2, &c, 1, HAL_MAX_DELAY);*/
 
-	  while (uart_rx_read_ptr != uart_rx_write_ptr) {
-		  uint8_t b = uart_rx_buf[uart_rx_read_ptr];
+		while (uart_rx_read_ptr != uart_rx_write_ptr) {
+			uint8_t b = uart_rx_buf[uart_rx_read_ptr];
 
-		  if (++uart_rx_read_ptr >= RX_BUFFER_LEN) uart_rx_read_ptr = 0; // increase read pointer
-		  uart_byte_available(b); // process every received byte with the RX state machine
-	  }
+			if (++uart_rx_read_ptr >= RX_BUFFER_LEN) uart_rx_read_ptr = 0; // increase read pointer
+			uart_byte_available(b); // process every received byte with the RX state machine
+		}
 
 
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+	}
   /* USER CODE END 3 */
 }
 
@@ -172,6 +199,7 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
@@ -200,6 +228,60 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_I2C1;
+  PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_HSI;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.Timing = 0x00201D2B;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
 }
 
 /**
@@ -311,11 +393,11 @@ static void MX_GPIO_Init(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+	/* User can add his own implementation to report the HAL error return state */
+	__disable_irq();
+	while (1)
+	{
+	}
   /* USER CODE END Error_Handler_Debug */
 }
 
@@ -330,7 +412,7 @@ void Error_Handler(void)
 void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
+	/* User can add his own implementation to report the file name and line number,
      ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
 }
