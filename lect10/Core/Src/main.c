@@ -31,7 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define DELAY 3000
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -47,6 +47,10 @@ UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 static volatile char key = 0;
+static uint32_t TicTak = 0;
+static const char password[] = {'1','2','3','4','#'};
+uint8_t pw_i = 0;
+uint8_t stisknuto = 0;
 
 int __io_putchar (int ch){
 	ITM_SendChar(ch);
@@ -137,17 +141,43 @@ int main(void)
 	while (1)
 	{
 		//printf("Tick\n");
-		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-		HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+		//HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+		//HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
 
 
 		if (key != 0) {
+			stisknuto = 1;
+			TicTak = HAL_GetTick();
 			printf("stisknuto '%c'\n", key);
 			HAL_Delay(500);
+
+
+			if(key == password[pw_i]){
+				pw_i++;
+				printf("Ok --> '%d' z 5\n", pw_i);
+				//printf("OK\n");
+
+				if(pw_i== 5){
+					printf("Unlocked\n");
+					HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin,1);
+					HAL_Delay(5000);
+					HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin,0);
+				}
+
+			}else{
+				printf("Error - Try again\n");
+				pw_i = 0;
+			}
 			key = 0;
-		}else{
-			HAL_Delay(250);
 		}
+		if((HAL_GetTick() > TicTak + DELAY)&&stisknuto == 1){
+			printf("Timeout - Try again\n");
+			pw_i = 0;
+			key = 0;
+			stisknuto = 0;
+		}
+
+
 
 		/* USER CODE END WHILE */
 
