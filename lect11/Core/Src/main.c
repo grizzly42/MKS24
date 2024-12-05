@@ -131,14 +131,14 @@ void mouse(int len, int px, int py,uint8_t vert){
 
 	step(px,py,0);
 
-		step(x,y,0);
-		if (vert){
-			y+=len;
-		}else{
-			x+=len;
-		}
-		step(x,y,0);
-		step(0,0,0);
+	step(x,y,0);
+	if (vert){
+		y+=len;
+	}else{
+		x+=len;
+	}
+	step(x,y,0);
+	step(0,0,0);
 }
 
 
@@ -200,6 +200,20 @@ int main(void)
 			draw_line(100,0,0,0);
 			draw_line(40,0,0,0);
 			draw_line(10,0,0,1);
+			mouse(-10,0,0,1);
+			mouse(-100,0,0,0);
+			mouse(20,0,0,0);
+			draw_line(20,0,0,1);
+			draw_line(20,0,0,0);
+			mouse(-20,0,0,1);
+			draw_line(20,0,0,1);
+			mouse(-20,0,0,1);
+			mouse(20,0,0,0);
+			draw_line(20,0,0,1);
+			draw_line(20,0,0,0);
+			mouse(-20,0,0,1);
+			draw_line(20,0,0,1);
+
 			//draw_line(100,0,0,0);
 			//mouse(5, 15, 0, 0);
 			//draw_line(10,0,10,0);
