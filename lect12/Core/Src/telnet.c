@@ -30,7 +30,6 @@
  *
  */
 
-
 #include "lwip/opt.h"
 
 #if LWIP_NETCONN
@@ -38,11 +37,10 @@
 #include "lwip/sys.h"
 #include "lwip/api.h"
 #include <string.h>
+#include <stdio.h>
 
 #define TELNET_THREAD_PRIO  ( tskIDLE_PRIORITY + 4 )
-#define CMD_BUFFER_LEN 256
-
-static void telnet_byte_available(uint8_t c, struct netconn *conn);
+#define CMD_BUFFER_LEN 64
 
 static void http_client(char *s, uint16_t size)
 {
@@ -50,25 +48,120 @@ static void http_client(char *s, uint16_t size)
 	struct netbuf *buf;
 	ip_addr_t ip;
 	uint16_t len = 0;
-	IP_ADDR4(&ip, 147,229,144,124);
+	IP_ADDR4(&ip, 147, 229, 144, 124);
 	const char *request = "GET /ip.php HTTP/1.1\r\n"
 			"Host: www.urel.feec.vutbr.cz\r\n"
 			"Connection: close\r\n"
 			"\r\n\r\n";
 	client = netconn_new(NETCONN_TCP);
-	if (netconn_connect(client, &ip, 80) == ERR_OK) {
+	if (netconn_connect(client, &ip, 80) == ERR_OK)
+	{
 		netconn_write(client, request, strlen(request), NETCONN_COPY);
 		// Receive the HTTP response
 		s[0] = 0;
-		while (len < size && netconn_recv(client, &buf) == ERR_OK) {
-			len += netbuf_copy(buf, &s[len], size-len);
+		while (len < size && netconn_recv(client, &buf) == ERR_OK)
+		{
+			len += netbuf_copy(buf, &s[len], size - len);
 			s[len] = 0;
 			netbuf_delete(buf);
 		}
-	} else {
+	}
+	else
+	{
 		sprintf(s, "Connection error\n");
 	}
 	netconn_delete(client);
+}
+
+static void telnet_process_command(char *cmd, struct netconn *conn)
+{
+
+	char s[512] =
+	{ "\0" };
+
+	sprintf(s, "cmd: %s\r\n", cmd);
+	netconn_write(conn, s, strlen(s), NETCONN_COPY);
+
+	char *token;
+	token = strtok(cmd, " ");
+	if (strcasecmp(token, "HELLO") == 0)
+	{
+		sprintf(s, "Kumunikujeme\r\n");
+		netconn_write(conn, s, strlen(s), NETCONN_COPY);
+	}
+	else if (strcasecmp(token, "LED1") == 0)
+	{
+		token = strtok(NULL, " ");
+		if (strcasecmp(token, "ON") == 0)
+		{
+			HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 1);
+
+		}
+		else if (strcasecmp(token, "OFF") == 0)
+		{
+			HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 0);
+		}
+		sprintf(s, "OK\r\n");
+		netconn_write(conn, s, strlen(s), NETCONN_COPY);
+	}
+	else if (strcasecmp(token, "LED2") == 0)
+	{
+		token = strtok(NULL, " ");
+		if (strcasecmp(token, "ON") == 0)
+		{
+			HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 1);
+		}
+		else if (strcasecmp(token, "OFF") == 0)
+		{
+			HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 0);
+		}
+		sprintf(s, "DOBRE\r\n");
+		netconn_write(conn, s, strlen(s), NETCONN_COPY);
+	}
+	else if (strcasecmp(token, "LED3") == 0)
+	{
+		token = strtok(NULL, " ");
+		if (strcasecmp(token, "ON") == 0)
+		{
+			HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 1);
+		}
+		else if (strcasecmp(token, "OFF") == 0)
+		{
+			HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 0);
+		}
+		sprintf(s, "DOBRE\r\n");
+		netconn_write(conn, s, strlen(s), NETCONN_COPY);
+	}
+	else if (strcasecmp(token, "STATUS") == 0)
+	{
+		uint8_t stat_1 = HAL_GPIO_ReadPin(LD1_GPIO_Port, LD1_Pin);
+		uint8_t stat_2 = HAL_GPIO_ReadPin(LD2_GPIO_Port, LD2_Pin);
+		uint8_t stat_3 = HAL_GPIO_ReadPin(LD3_GPIO_Port, LD3_Pin);
+		sprintf(s, "Status of LED1: %d, LED2: %d, LED3: %d\n", stat_1, stat_2,stat_3);
+		netconn_write(conn, s, strlen(s), NETCONN_COPY);
+		sprintf(s, "DOBRE\r\n");
+		netconn_write(conn, s, strlen(s), NETCONN_COPY);
+	}
+	else if (strcasecmp(token, "CLIENT") == 0)
+	{
+		http_client(s, 512);
+		netconn_write(conn, s, strlen(s), NETCONN_COPY);
+	}
+
+}
+
+static void telnet_byte_available(uint8_t c, struct netconn *conn)
+{
+	static uint16_t cnt;
+	static char data[CMD_BUFFER_LEN];
+	if (cnt < CMD_BUFFER_LEN && c >= 32 && c <= 127)
+		data[cnt++] = c;
+	if (c == '\n')
+	{
+		data[cnt] = '\0';
+		telnet_process_command(data, conn);
+		cnt = 0;
+	}
 }
 
 /*-----------------------------------------------------------------------------------*/
@@ -79,45 +172,38 @@ static void telnet_thread(void *arg)
 	struct netbuf *buf;
 	uint8_t *data;
 	u16_t len;
-
 	LWIP_UNUSED_ARG(arg);
-
-	/* Create a new connection identifier. */
 	conn = netconn_new(NETCONN_TCP);
 
-	if (conn!=NULL)
+	if (conn != NULL)
 	{
-		/* Bind connection to well known port number 7. */
+		/* Bind connection to well known port number 23. */
 		err = netconn_bind(conn, NULL, 23);
 
 		if (err == ERR_OK)
 		{
-			/* Tell connection to go into listening mode. */
 			netconn_listen(conn);
 
 			while (1)
 			{
-				/* Grab new connection. */
 				accept_err = netconn_accept(conn, &newconn);
-
-				/* Process the new connection. */
 				if (accept_err == ERR_OK)
 				{
-
 					while (netconn_recv(newconn, &buf) == ERR_OK)
 					{
 						do
 						{
-							netbuf_data(buf, (void**)&data, &len);
-							while (len--) telnet_byte_available(*data++, newconn);
+							/*netbuf_data(buf, &data, &len);
+							 netconn_write(newconn, data, len, NETCONN_COPY);*/
 
-						}
-						while (netbuf_next(buf) >= 0);
+							netbuf_data(buf, (void**) &data, &len);
+							while (len--)
+								telnet_byte_available(*data++, newconn);
+
+						} while (netbuf_next(buf) >= 0);
 
 						netbuf_delete(buf);
 					}
-
-					/* Close connection and discard connection identifier. */
 					netconn_close(newconn);
 					netconn_delete(newconn);
 				}
@@ -136,109 +222,5 @@ void telnet_init(void)
 	sys_thread_new("telnet_thread", telnet_thread, NULL, DEFAULT_THREAD_STACKSIZE, TELNET_THREAD_PRIO);
 }
 /*-----------------------------------------------------------------------------------*/
-static void telnet_process_command(char *cmd, struct netconn *conn)
-{
-	//printf("received: '%s'\n", cmd);
-
-	char *token;
-
-	token = strtok(cmd, " ");
-	char s[512];
-
-	if (strcasecmp(token, "HELLO") == 0) {
-		sprintf(s, "Communication OK\r\n");
-
-		//      printf("Communication OK\n");
-	}
-
-	else if (strcasecmp(token, "LD1") == 0) {
-		token = strtok(NULL, " ");
-		if (strcasecmp(token, "ON") == 0) {
-			HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 1);
-		} else if (strcasecmp(token, "OFF") == 0) {
-			HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 0);
-		}
-		sprintf(s, "OK\r\n");
-		//      printf("OK\n");
-	}
-
-	else if (strcasecmp(token, "LD2") == 0) {
-		token = strtok(NULL, " ");
-		if (strcasecmp(token, "ON") == 0) {
-			HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 1);
-		} else if (strcasecmp(token, "OFF") == 0) {
-			HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 0);
-		}
-		sprintf(s, "OK\r\n");
-		//      printf("OK\n");
-	}
-
-	else if (strcasecmp(token, "LD3") == 0) {
-		token = strtok(NULL, " ");
-		if (strcasecmp(token, "ON") == 0) {
-			HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 1);
-		} else if (strcasecmp(token, "OFF") == 0) {
-			HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 0);
-		}
-		sprintf(s, "OK\r\n");
-		//      printf("OK\n");
-	}
-
-	else if (strcasecmp(token, "STATUS") == 0) {
-		if (HAL_GPIO_ReadPin(LD1_GPIO_Port, LD1_Pin)){
-			sprintf(s, "LD1 ON\r\n");
-			//          printf("LD1 ON\n");
-		} else{
-			sprintf(s, "LD1 OFF\r\n");
-			//          printf("LD1 OFF\n");
-		}
-
-		if (HAL_GPIO_ReadPin(LD2_GPIO_Port, LD2_Pin) == 1){
-			sprintf(s, "LD2 ON\r\n");
-			//          printf("LD2 ON\n");
-		} else{
-			sprintf(s, "LD2 OFF\r\n");
-			//          printf("LD2 OFF\n");
-		}
-
-		if (HAL_GPIO_ReadPin(LD3_GPIO_Port, LD3_Pin) == 1){
-			sprintf(s, "LD3 ON\r\n");
-			//          printf("LD2 ON\n");
-		} else{
-			sprintf(s, "LD3 OFF\r\n");
-			//          printf("LD2 OFF\n");
-		}
-
-
-		sprintf(s, "OK\r\n");
-		//      printf("OK\n");
-
-	}
-
-
-	else if (strcasecmp(token, "CLIENT") == 0) {
-		sprintf(s, "CLIENT OK\r\n");
-		netconn_write(conn, s, strlen(s), NETCONN_COPY);
-		//      printf("OK\n");
-		http_client(s, sizeof(s));
-		netconn_write(conn, s, strlen(s), NETCONN_COPY);
-	}
-	netconn_write(conn, s, strlen(s), NETCONN_COPY);
-
-}
-/*-----------------------------------------------------------------------------------*/
-static void telnet_byte_available(uint8_t c, struct netconn *conn)
-{
-	static uint16_t cnt;
-	static char data[CMD_BUFFER_LEN];
-	if (cnt < CMD_BUFFER_LEN && c >= 32 && c <= 127) data[cnt++] = c;
-	if (c == '\n' || c == '\r') {
-		data[cnt] = '\0';
-		telnet_process_command(data, conn);
-		cnt = 0;
-	}
-}
-/*-----------------------------------------------------------------------------------*/
 
 #endif /* LWIP_NETCONN */
-
